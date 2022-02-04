@@ -356,7 +356,6 @@ class LunarAscentThrustGuidance:
         -------
         none
         """
-        print('Initializing guidance...')
         # Set arguments as attributes
         self.vehicle_body = vehicle_body
         self.initial_time = initial_time

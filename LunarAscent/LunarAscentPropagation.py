@@ -146,10 +146,18 @@ thrust_parameters_list = [
 [11994.6615921799,63.0374983558,0.0987704021,0.1910929221,0.4622633364,0.6333203944,0.8949938918],
 [19651.4163620304,22.5348709058,-0.0480510497,0.2239391366,0.0206275638,-0.2690444668,-1.147023045]]
 
-for count in range(len(thrust_parameters_list)):
+counter = 0
+for count in range(10000):
 
-    thrust_parameters=thrust_parameters_list[count]
-    print(thrust_parameters)
+    thrust_parameters=np.zeros(9)
+    thrust_parameters[0] = np.random.uniform(10000, 25000)
+    thrust_parameters[1] = np.random.uniform(10, 100)
+    thrust_parameters[2] = np.random.uniform(0.0, 0.1)
+    thrust_parameters[3] = np.random.uniform(0.3, 0.5)
+    thrust_parameters[4] = np.random.uniform(0.5, 0.7)
+    thrust_parameters[5] = np.random.uniform(0.5, 1.0)
+    thrust_parameters[5] = np.random.uniform(0.6, 1.3)
+
     # Choose whether benchmark is run
     use_benchmark = True
     run_integrator_analysis = True
@@ -213,67 +221,101 @@ for count in range(len(thrust_parameters_list)):
     # Check whether there is any
     are_dependent_variables_to_save = False if not dependent_variables_to_save else True
 
-    ###########################################################################
-    # IF DESIRED, GENERATE BENCHMARK ##########################################
-    ###########################################################################
+    benchmark_step_size = 1.0
+    benchmark_integrator_settings = propagation_setup.integrator.runge_kutta_variable_step_size(
+        simulation_start_epoch,
+        benchmark_step_size,
+        propagation_setup.integrator.RKCoefficientSets.rkdp_87,
+        benchmark_step_size,
+        benchmark_step_size,
+        np.inf,
+        np.inf)
 
-    if use_benchmark:
 
-        # Define benchmark interpolator settings to make a comparison between the two benchmarks
-        benchmark_interpolator_settings = interpolators.lagrange_interpolation(
-            8,boundary_interpolation = interpolators.extrapolate_at_boundary)
+    # Create propagator settings for benchmark (Cowell)
+    propagator_settings = Util.get_propagator_settings(
+        thrust_parameters,
+        bodies,
+        simulation_start_epoch,
+        constant_specific_impulse,
+        vehicle_mass,
+        termination_settings,
+        dependent_variables_to_save)
 
-        # Create propagator settings for benchmark (Cowell)
-        propagator_settings = Util.get_propagator_settings(
-            thrust_parameters,
-            bodies,
-            simulation_start_epoch,
-            constant_specific_impulse,
-            vehicle_mass,
-            termination_settings,
-            dependent_variables_to_save)
+    benchmark_integrator_settings = propagation_setup.integrator.runge_kutta_variable_step_size(
+        simulation_start_epoch,
+        1.0,
+        propagation_setup.integrator.RKCoefficientSets.rkdp_87,
+        1.0,
+        1.0,
+        np.inf,
+        np.inf)
 
-        benchmark_output_path = current_dir + '/SimulationOutput/benchmarks_' + str(count) + '/' if write_results_to_file else None
+    first_dynamics_simulator = numerical_simulation.SingleArcSimulator(
+        bodies,
+        benchmark_integrator_settings,
+        propagator_settings, print_dependent_variable_data=False)
 
-        # Generate benchmarks
-        benchmark_step_size = 1.0
-        benchmark_list = Util.generate_benchmarks(benchmark_step_size,
-                                                  simulation_start_epoch,
-                                                  bodies,
-                                                  propagator_settings,
-                                                  are_dependent_variables_to_save,
-                                                  benchmark_output_path)
+    dependent_variables = first_dynamics_simulator.dependent_variable_history
+    dependent_variables_array = np.vstack(list(dependent_variables.values()))
 
-        # Extract benchmark states
-        first_benchmark_state_history = benchmark_list[0]
-        second_benchmark_state_history = benchmark_list[1]
+    if( ( dependent_variables_array[-1,0] >100000.0 ) & ( dependent_variables_array[-1,1] >800.0 ) & ( dependent_variables_array[-1,2]  < 0.7 ) ):
+        print(count)
+        print(thrust_parameters)
+        print(dependent_variables_array[-1,:])
+        counter = counter + 1
+        thrust_parameters_to_print = dict()
+        thrust_parameters_to_print[0.0] = thrust_parameters
 
-        # Create state interpolator for first benchmark
-        benchmark_state_interpolator = interpolators.create_one_dimensional_vector_interpolator(
-            first_benchmark_state_history,
-            benchmark_interpolator_settings)
+        if use_benchmark:
 
-        # Compare benchmark states, returning interpolator of the first benchmark, and writing difference to file if
-        # write_results_to_file is set to True
-        benchmark_state_difference = Util.compare_benchmarks(first_benchmark_state_history,
-                                                             second_benchmark_state_history,
-                                                             benchmark_output_path,
-                                                             'benchmarks_state_difference.dat')
+            # Define benchmark interpolator settings to make a comparison between the two benchmarks
+            benchmark_interpolator_settings = interpolators.lagrange_interpolation(
+                8,boundary_interpolation = interpolators.extrapolate_at_boundary)
 
-        # Extract benchmark dependent variables, if present
-        if are_dependent_variables_to_save:
-            first_benchmark_dependent_variable_history = benchmark_list[2]
-            second_benchmark_dependent_variable_history = benchmark_list[3]
 
-            # Create dependent variable interpolator for first benchmark
-            benchmark_dependent_variable_interpolator = interpolators.create_one_dimensional_vector_interpolator(
-                first_benchmark_dependent_variable_history,
+            benchmark_output_path = current_dir + '/SimulationOutputSearch/benchmarks_' + str(counter) + '/' if write_results_to_file else None
+
+            # Generate benchmarks
+            benchmark_list = Util.generate_benchmarks(benchmark_step_size,
+                                                      simulation_start_epoch,
+                                                      bodies,
+                                                      propagator_settings,
+                                                      are_dependent_variables_to_save,
+                                                      benchmark_output_path)
+            save2txt(thrust_parameters_to_print, 'parameters.dat', benchmark_output_path)
+
+
+            # Extract benchmark states
+            first_benchmark_state_history = benchmark_list[0]
+            second_benchmark_state_history = benchmark_list[1]
+
+            # Create state interpolator for first benchmark
+            benchmark_state_interpolator = interpolators.create_one_dimensional_vector_interpolator(
+                first_benchmark_state_history,
                 benchmark_interpolator_settings)
 
-            # Compare benchmark dependent variables, returning interpolator of the first benchmark, and writing difference
-            # to file if write_results_to_file is set to True
-            benchmark_dependent_difference = Util.compare_benchmarks(first_benchmark_dependent_variable_history,
-                                                                     second_benchmark_dependent_variable_history,
-                                                                     benchmark_output_path,
-                                                                     'benchmarks_dependent_variable_difference.dat')
+            # Compare benchmark states, returning interpolator of the first benchmark, and writing difference to file if
+            # write_results_to_file is set to True
+            benchmark_state_difference = Util.compare_benchmarks(first_benchmark_state_history,
+                                                                 second_benchmark_state_history,
+                                                                 benchmark_output_path,
+                                                                 'benchmarks_state_difference.dat')
+
+            # Extract benchmark dependent variables, if present
+            if are_dependent_variables_to_save:
+                first_benchmark_dependent_variable_history = benchmark_list[2]
+                second_benchmark_dependent_variable_history = benchmark_list[3]
+
+                # Create dependent variable interpolator for first benchmark
+                benchmark_dependent_variable_interpolator = interpolators.create_one_dimensional_vector_interpolator(
+                    first_benchmark_dependent_variable_history,
+                    benchmark_interpolator_settings)
+
+                # Compare benchmark dependent variables, returning interpolator of the first benchmark, and writing difference
+                # to file if write_results_to_file is set to True
+                benchmark_dependent_difference = Util.compare_benchmarks(first_benchmark_dependent_variable_history,
+                                                                         second_benchmark_dependent_variable_history,
+                                                                         benchmark_output_path,
+                                                                         'benchmarks_dependent_variable_difference.dat')
 

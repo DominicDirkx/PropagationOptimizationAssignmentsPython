@@ -146,12 +146,12 @@ spice_interface.load_standard_kernels()
 # SIZE OF THE NEW LIST trajectory_parameters WILL BE DIFFERENT FROM THE
 # SIZE OF THE ONE REPORTED BELOW. THIS IS ALREADY ACCOUNTED FOR IN THE CODE.
 thrust_parameters_list = [
-[303.3622685185,385.03125,0,-999.466,-6807.06,-3851.67,1519.75,7624.45,9524.28],
-[413.0474537037,315.8425925926,0,-4898.13,3852.17,-4754.69,1852.23,990.67,1737.89],
-[8199.4560185185,354.7326388889,0,5676.33,-7329.29,-2345.44,8711.12,-5988.68,-4257.05],
-[7454.4212962963,320.5648148148,0,8661.95,8425.79,-8632.97,5666.72,-3567.68,-2806.92],
-[6596.3425925926,437.28125,0,1661.51,1214.98,-5583.44,5608.25,8846.71,6974.26],
-[6557.9398148148,438.068287037,0,1017.75,-3848.92,-1587.56,-589.296,2461.11,7737.28],
+[303.3622685185,385.03125,0,        -999.466,-6807.06,-3851.67,1519.75,7624.45,9524.28],
+[413.0474537037,315.8425925926,0,   -4898.13,3852.17,-4754.69,1852.23,990.67,1737.89],
+[8199.4560185185,354.7326388889,0,  5676.33,-7329.29,-2345.44,8711.12,-5988.68,-4257.05],
+[7454.4212962963,320.5648148148,0,  8661.95,8425.79,-8632.97,5666.72,-3567.68,-2806.92],
+[6596.3425925926,437.28125,0,       1661.51,1214.98,-5583.44,5608.25,8846.71,6974.26],
+[6557.9398148148,438.068287037,0,   1017.75,-3848.92,-1587.56,-589.296,2461.11,7737.28],
 [1076.2951388889,501.40625,1,5681.65,4113.11,-9222.22,-2795.61,483.14,7345.91],
 [1933.4259259259,569.8865740741,1,2159.43,3666.56,-8289.99,2095.89,-3822.54,-5767.08],
 [270.1944444444,659.6053240741,1,-4630.2,-8210.04,-3817.67,-563.669,-4826.04,3880.13],
@@ -159,10 +159,20 @@ thrust_parameters_list = [
 [1915.1851851852,595.3113425926,1,3292.83,5258.7,-9230.84,1928.56,-9672.92,-6155.89],
 [2616.6782407408,780.09375,1,-6534.69,1320.06,-4655.8,-2902.23,-5091.87,-9810.39]]
 
-for count in range(len(thrust_parameters_list)):
+counter = 0
+for count in range(10000):
 
-    trajectory_parameters=thrust_parameters_list[count]
-    print(trajectory_parameters)
+    trajectory_parameters=np.zeros(9)
+    trajectory_parameters[0] = np.random.uniform(0, 6000)
+    trajectory_parameters[1] = np.random.uniform(100, 800)
+    trajectory_parameters[2] = 1
+    trajectory_parameters[3] = np.random.uniform(-10000, 10000)
+    trajectory_parameters[4] = np.random.uniform(-10000, 10000)
+    trajectory_parameters[5] = np.random.uniform(-10000, 10000)
+    trajectory_parameters[6] = np.random.uniform(-10000, 10000)
+    trajectory_parameters[7] = np.random.uniform(-10000, 10000)
+    trajectory_parameters[8] = np.random.uniform(-10000, 10000)
+
     # Choose whether benchmark is run
     use_benchmark = True
     # Choose whether output of the propagation is written to files
@@ -210,95 +220,107 @@ for count in range(len(thrust_parameters_list)):
     bodies.create_empty_body('Vehicle')
     bodies.get_body('Vehicle').mass = vehicle_mass
 
-    ###########################################################################
-    # CREATE PROPAGATOR SETTINGS ##############################################
-    ###########################################################################
-
-
-    # Retrieve termination settings
-    termination_settings = Util.get_termination_settings(trajectory_parameters,
-                                                         minimum_mars_distance,
-                                                         time_buffer)
-    # Retrieve dependent variables to save
-    dependent_variables_to_save = Util.get_dependent_variable_save_settings()
-    # Check whether there is any
-    are_dependent_variables_to_save = False if not dependent_variables_to_save else True
-
-
-    ###########################################################################
-    # IF DESIRED, GENERATE AND COMPARE BENCHMARKS #############################
-    ###########################################################################
-
-    # NOTE TO STUDENTS: MODIFY THE CODE INSIDE THIS "IF STATEMENT" (AND CALLED FUNCTIONS, IF NEEDED)
-    # TO ASSESS THE QUALITY OF VARIOUS BENCHMARK SETTINGS
-    if use_benchmark:
-        # Define benchmark interpolator settings to make a comparison between the two benchmarks
-        benchmark_interpolator_settings = interpolators.lagrange_interpolation(
-            8,boundary_interpolation = interpolators.extrapolate_at_boundary)
-
-        # Create propagator settings for benchmark (Cowell)
-        propagator_settings = Util.get_propagator_settings(
-            trajectory_parameters,
-            bodies,
-            initial_propagation_time,
-            specific_impulse,
-            vehicle_mass,
-            termination_settings,
-            dependent_variables_to_save)
-
-        benchmark_output_path = current_dir + '/SimulationOutput/benchmarks_' + str(count) + '/' if write_results_to_file else None
-
-        # Generate benchmarks
-        benchmark_step_size = 86400.0
-        benchmark_list = Util.generate_benchmarks(benchmark_step_size,
-                                                  initial_propagation_time,
-                                                  bodies,
-                                                  propagator_settings,
-                                                  are_dependent_variables_to_save,
-                                                  benchmark_output_path)
-        # Extract benchmark states
-        first_benchmark_state_history = benchmark_list[0]
-        second_benchmark_state_history = benchmark_list[1]
-        # Create state interpolator for first benchmark
-        benchmark_state_interpolator = interpolators.create_one_dimensional_vector_interpolator(first_benchmark_state_history,
-                                                                                                benchmark_interpolator_settings)
-
-        # Compare benchmark states, returning interpolator of the first benchmark
-        benchmark_state_difference = Util.compare_benchmarks(first_benchmark_state_history,
-                                                             second_benchmark_state_history,
-                                                             benchmark_output_path,
-                                                             'benchmarks_state_difference.dat')
-
-        # Extract benchmark dependent variables, if present
-        if are_dependent_variables_to_save:
-            first_benchmark_dependent_variable_history = benchmark_list[2]
-            second_benchmark_dependent_variable_history = benchmark_list[3]
-            # Create dependent variable interpolator for first benchmark
-            benchmark_dependent_variable_interpolator = interpolators.create_one_dimensional_vector_interpolator(
-                first_benchmark_dependent_variable_history,
-                benchmark_interpolator_settings)
-
-            # Compare benchmark dependent variables, returning interpolator of the first benchmark, if present
-            benchmark_dependent_difference = Util.compare_benchmarks(first_benchmark_dependent_variable_history,
-                                                                     second_benchmark_dependent_variable_history,
-                                                                     benchmark_output_path,
-                                                                     'benchmarks_dependent_variable_difference.dat')
-
-    ###########################################################################
-    # WRITE RESULTS FOR SEMI-ANALYTICAL METHOD ################################
-    ###########################################################################
-
     # Create problem without propagating
     hodographic_shaping_object = Util.create_hodographic_shaping_object(trajectory_parameters,
                                                                         bodies)
+    if(hodographic_shaping_object.compute_delta_v()<10000):
+        print(count)
+        print(trajectory_parameters)
+        print(hodographic_shaping_object.compute_delta_v())
+        counter = counter + 1
+        trajectory_parameters_to_print = dict()
+        trajectory_parameters_to_print[ 0.0 ] = trajectory_parameters
 
-    # Prepares output path
-    if write_results_to_file:
-        output_path = current_dir + '/SimulationOutput/HodographicSemiAnalytical/'
-    else:
-        output_path = None
-    # Retrieves analytical results and write them to a file
-    Util.get_hodographic_trajectory(hodographic_shaping_object,
-                                    trajectory_parameters,
-                                    specific_impulse,
-                                    output_path)
+        ###########################################################################
+        # CREATE PROPAGATOR SETTINGS ##############################################
+        ###########################################################################
+
+
+        # Retrieve termination settings
+        termination_settings = Util.get_termination_settings(trajectory_parameters,
+                                                             minimum_mars_distance,
+                                                             time_buffer)
+        # Retrieve dependent variables to save
+        dependent_variables_to_save = Util.get_dependent_variable_save_settings()
+        # Check whether there is any
+        are_dependent_variables_to_save = False if not dependent_variables_to_save else True
+
+
+        ###########################################################################
+        # IF DESIRED, GENERATE AND COMPARE BENCHMARKS #############################
+        ###########################################################################
+
+        # NOTE TO STUDENTS: MODIFY THE CODE INSIDE THIS "IF STATEMENT" (AND CALLED FUNCTIONS, IF NEEDED)
+        # TO ASSESS THE QUALITY OF VARIOUS BENCHMARK SETTINGS
+        if use_benchmark:
+            # Define benchmark interpolator settings to make a comparison between the two benchmarks
+            benchmark_interpolator_settings = interpolators.lagrange_interpolation(
+                8,boundary_interpolation = interpolators.extrapolate_at_boundary)
+
+            # Create propagator settings for benchmark (Cowell)
+            propagator_settings = Util.get_propagator_settings(
+                trajectory_parameters,
+                bodies,
+                initial_propagation_time,
+                specific_impulse,
+                vehicle_mass,
+                termination_settings,
+                dependent_variables_to_save)
+
+            benchmark_output_path = current_dir + '/SimulationOutputSearch1/benchmarks_' + str(counter) + '/' if write_results_to_file else None
+            save2txt(trajectory_parameters_to_print, 'parameters.dat', benchmark_output_path)
+
+            # Generate benchmarks
+            benchmark_step_size = 86400.0
+            benchmark_list = Util.generate_benchmarks(benchmark_step_size,
+                                                      initial_propagation_time,
+                                                      bodies,
+                                                      propagator_settings,
+                                                      are_dependent_variables_to_save,
+                                                      benchmark_output_path)
+            # Extract benchmark states
+            first_benchmark_state_history = benchmark_list[0]
+            second_benchmark_state_history = benchmark_list[1]
+            # Create state interpolator for first benchmark
+            benchmark_state_interpolator = interpolators.create_one_dimensional_vector_interpolator(first_benchmark_state_history,
+                                                                                                    benchmark_interpolator_settings)
+
+            # Compare benchmark states, returning interpolator of the first benchmark
+            benchmark_state_difference = Util.compare_benchmarks(first_benchmark_state_history,
+                                                                 second_benchmark_state_history,
+                                                                 benchmark_output_path,
+                                                                 'benchmarks_state_difference.dat')
+
+            # Extract benchmark dependent variables, if present
+            if are_dependent_variables_to_save:
+                first_benchmark_dependent_variable_history = benchmark_list[2]
+                second_benchmark_dependent_variable_history = benchmark_list[3]
+                # Create dependent variable interpolator for first benchmark
+                benchmark_dependent_variable_interpolator = interpolators.create_one_dimensional_vector_interpolator(
+                    first_benchmark_dependent_variable_history,
+                    benchmark_interpolator_settings)
+
+                # Compare benchmark dependent variables, returning interpolator of the first benchmark, if present
+                benchmark_dependent_difference = Util.compare_benchmarks(first_benchmark_dependent_variable_history,
+                                                                         second_benchmark_dependent_variable_history,
+                                                                         benchmark_output_path,
+                                                                         'benchmarks_dependent_variable_difference.dat')
+
+        # ###########################################################################
+        # # WRITE RESULTS FOR SEMI-ANALYTICAL METHOD ################################
+        # ###########################################################################
+        #
+        # # Create problem without propagating
+        # hodographic_shaping_object = Util.create_hodographic_shaping_object(trajectory_parameters,
+        #                                                                     bodies)
+        #
+        # # Prepares output path
+        # if write_results_to_file:
+        #     output_path = current_dir + '/SimulationOutput/HodographicSemiAnalytical/'
+        # else:
+        #     output_path = None
+        # # Retrieves analytical results and write them to a file
+        # Util.get_hodographic_trajectory(hodographic_shaping_object,
+        #                                 trajectory_parameters,
+        #                                 specific_impulse,
+        #                                 output_path)
